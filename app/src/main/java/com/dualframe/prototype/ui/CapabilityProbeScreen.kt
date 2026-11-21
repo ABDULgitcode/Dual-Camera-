@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.dualframe.prototype.camera.CameraCapabilityProbe
 import com.dualframe.prototype.model.CameraCapability
 import com.dualframe.prototype.model.DeviceCapabilityReport
+import com.dualframe.prototype.model.DualEncodeSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -66,8 +67,8 @@ fun CapabilityProbeScreen(
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = "Week 1 lab stub — Approach A (single-stream dual crop). " +
-                "Lists Camera2 sizes/FPS and concurrent session hints.",
+            text = "Week 2 — Approach A probe + dual 1080p MediaCodec gate. " +
+                "Lists Camera2 sizes/FPS, concurrent hints, and encode support.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -77,7 +78,7 @@ fun CapabilityProbeScreen(
             onClick = onOpenPreview,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Open dual preview stub")
+            Text("Open capture (preview + record)")
         }
 
         when {
@@ -129,6 +130,9 @@ fun CapabilityProbeScreen(
                             }
                         }
                     }
+                    item {
+                        DualEncodeCard(r.dualEncodeSupport)
+                    }
                     items(r.cameras, key = { it.cameraId }) { camera ->
                         CameraCard(camera)
                     }
@@ -158,6 +162,31 @@ private fun InfoCard(
                 content()
             }
         }
+    }
+}
+
+@Composable
+private fun DualEncodeCard(support: DualEncodeSupport?) {
+    InfoCard(title = "Dual 1080p encode (Approach A)") {
+        if (support == null) {
+            Text("Encode probe did not run.")
+            return@InfoCard
+        }
+        Text(
+            if (support.dualSupported) "Dual encode: SUPPORTED"
+            else "Dual encode: NOT SUPPORTED — Dual mode will be disabled",
+        )
+        Text(
+            if (support.singleSupported) "Single-orientation 1080p: SUPPORTED"
+            else "Single-orientation 1080p: NOT SUPPORTED",
+        )
+        Text("Preferred MIME: ${support.preferredMime ?: "(none)"}")
+        Text(
+            "Targets: L ${support.landscapeWidth}×${support.landscapeHeight}, " +
+                "P ${support.portraitWidth}×${support.portraitHeight} @ ${support.targetFps} fps",
+        )
+        support.reasons.forEach { Text("• $it") }
+        support.notes.forEach { Text("• $it") }
     }
 }
 

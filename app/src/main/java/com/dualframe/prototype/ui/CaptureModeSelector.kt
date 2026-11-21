@@ -9,7 +9,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier.Modifier
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dualframe.prototype.model.CaptureMode
 
@@ -18,6 +18,8 @@ fun CaptureModeSelector(
     selected: CaptureMode,
     onSelected: (CaptureMode) -> Unit,
     modifier: Modifier = Modifier,
+    dualEnabled: Boolean = true,
+    dualDisabledReason: String? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -31,18 +33,25 @@ fun CaptureModeSelector(
             modifier = Modifier.fillMaxWidth(),
         ) {
             CaptureMode.entries.forEach { mode ->
+                val enabled = mode != CaptureMode.DUAL || dualEnabled
                 FilterChip(
                     selected = selected == mode,
-                    onClick = { onSelected(mode) },
+                    onClick = { if (enabled) onSelected(mode) },
+                    enabled = enabled,
                     label = { Text(mode.shortLabel) },
                 )
             }
         }
         Text(
-            text = when (selected) {
-                CaptureMode.PORTRAIT -> "Shows 9:16 crop only. Week 1: composition stub."
-                CaptureMode.LANDSCAPE -> "Shows 16:9 crop only. Week 1: composition stub."
-                CaptureMode.DUAL -> "Both overlays. Dual encode lands in Week 2."
+            text = when {
+                selected == CaptureMode.DUAL && !dualEnabled ->
+                    dualDisabledReason ?: "Dual encode unavailable — use Portrait or Landscape."
+                selected == CaptureMode.PORTRAIT ->
+                    "Records one 1080×1920 file (DF_*_P.mp4) from the 9:16 crop."
+                selected == CaptureMode.LANDSCAPE ->
+                    "Records one 1920×1080 file (DF_*_L.mp4) from the 16:9 crop."
+                else ->
+                    "Records paired DF_*_L.mp4 + DF_*_P.mp4 from one stream (Approach A)."
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),

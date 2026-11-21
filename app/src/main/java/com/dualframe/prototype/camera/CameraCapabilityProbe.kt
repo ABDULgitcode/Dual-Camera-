@@ -46,11 +46,13 @@ class CameraCapabilityProbe(
         notes += "Approach A uses a single camera stream with dual crop — " +
             "concurrent multi-camera is optional (Approach B), not required for Dual files."
         notes += "Max concurrent hardware encoders are not exposed as a single Camera2 key; " +
-            "Week 2 will stress dual MediaCodec sessions empirically."
+            "dual encode support is probed empirically via MediaCodec configure (see Dual encode card)."
 
         val cameras = manager.cameraIdList.map { id ->
             probeCamera(manager, id)
         }
+
+        val dualEncode = DualEncodeCapability.probe(context)
 
         return DeviceCapabilityReport(
             androidSdkInt = Build.VERSION.SDK_INT,
@@ -59,6 +61,7 @@ class CameraCapabilityProbe(
             cameras = cameras,
             concurrentCameraIds = concurrentSets,
             concurrentSessionNotes = notes,
+            dualEncodeSupport = dualEncode,
         )
     }
 

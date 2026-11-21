@@ -19,15 +19,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier.modifier
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dualframe.prototype.ui.CapabilityProbeScreen
 import com.dualframe.prototype.ui.DualPreviewScreen
 import com.dualframe.prototype.ui.theme.DualFrameTheme
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
-import com.google.accompanist.permissions.shouldShowRationale
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,14 +49,18 @@ private enum class AppScreen {
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun DualFrameApp() {
-    val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+    val permissions = rememberMultiplePermissionsState(
+        listOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO,
+        ),
+    )
     var screen by remember { mutableStateOf(AppScreen.Probe) }
 
     when {
-        !cameraPermission.status.isGranted -> {
+        !permissions.allPermissionsGranted -> {
             PermissionGate(
-                rationale = cameraPermission.status.shouldShowRationale,
-                onRequest = { cameraPermission.launchPermissionRequest() },
+                onRequest = { permissions.launchMultiplePermissionRequest() },
             )
         }
 
@@ -74,7 +76,6 @@ private fun DualFrameApp() {
 
 @Composable
 private fun PermissionGate(
-    rationale: Boolean,
     onRequest: () -> Unit,
 ) {
     Column(
@@ -85,20 +86,17 @@ private fun PermissionGate(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "Camera permission required",
+            text = "Camera and microphone required",
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = if (rationale) {
-                "DualFrame Lab needs the camera to list hardware capabilities and show the dual-crop viewfinder stub."
-            } else {
-                "Grant camera access to continue the Week 1 prototype."
-            },
+            text = "DualFrame Lab needs the camera for preview/encode and the microphone " +
+                "so both output files can share the same AAC audio track.",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(vertical = 12.dp),
         )
         Button(onClick = onRequest) {
-            Text("Grant camera")
+            Text("Grant permissions")
         }
     }
 }

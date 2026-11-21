@@ -1,75 +1,108 @@
 # DualFrame (Dual-Camera)
 
-Android Phase 0 lab prototype for **Approach A**: one tall/wide sensor stream, dual crop into portrait (9:16) and landscape (16:9) outputs.
+Android Phase 0 lab prototype for **Approach A**: one sensor stream → dual crop into portrait (9:16) and landscape (16:9) → paired files.
 
-Working name from the DualFrame PRD. This repo currently holds the **Week 1 scaffold** only.
-
-## Week 1 status
+## Status
 
 | Piece | Status |
 | --- | --- |
-| Kotlin Android app module (`:app`) | Done |
-| Camera capability probe (Camera2 sizes / FPS / concurrent IDs) | Done |
-| Dual preview stub with 16:9 + 9:16 crop overlays | Done |
-| Capture mode selector UI (Portrait / Landscape / Dual) | Done |
-| Dual hardware encode → two files | **Week 2** |
-
-Record is intentionally disabled in the viewfinder until Week 2.
+| Kotlin Android app (`:app`, minSdk 29) | Done |
+| Camera capability probe (Camera2 + dual MediaCodec gate) | Done |
+| Dual preview with 16:9 + 9:16 overlays | Done |
+| Capture mode selector (Portrait / Landscape / Dual) | Done |
+| Dual / single **1080p** encode + shared AAC audio | Done (Week 2) |
+| GPU crop pipeline / thermal matrix | Later lab weeks |
 
 ## Requirements
 
-- **Android Studio** Ladybug / Koala or newer (AGP 8.7.x)
-- **JDK 17**
-- **Android SDK** with:
-  - `compileSdk` / `targetSdk` **35**
-  - `minSdk` **29** (Android 10+)
-  - Platform tools + a device or emulator with a camera
-- Gradle Wrapper (`./gradlew`) — included in this repo
+- **Android Studio** (AGP 8.7.x) + **JDK 17**
+- **Android SDK** 35 (`compileSdk` / `targetSdk`), `minSdk` 29
+- Physical phone strongly preferred (emulator camera + dual encode is not a valid Phase 0 proof)
 
-This cloud agent environment did **not** have an Android SDK installed, so APKs were **not** built or claimed green here. Build on a machine with the SDK, or CI with Android build images.
+This cloud agent environment has **no Android SDK**. `./gradlew :app:assembleDebug` fails with `SDK location not found`. That is expected — do not treat missing-SDK failures as a green build.
 
 ## Build and run
 
 ```bash
-# From repo root
 ./gradlew :app:assembleDebug
-
-# Install on a connected device / emulator
 ./gradlew :app:installDebug
 ```
 
-Or open the project in Android Studio → **Run** `app`.
+Or open in Android Studio → Run `app`.
 
-On first launch:
+### Permissions
 
-1. Grant **Camera** permission.
-2. **Capability probe** lists cameras, hardware level, AE FPS ranges, output sizes (MediaRecorder / YUV / PRIVATE / JPEG / high-speed), and concurrent-camera notes when API 30+ exposes them.
-3. Tap **Open dual preview stub** for the CameraX viewfinder with crop overlays and the mode selector.
+Grant **Camera** and **Microphone**. Audio is encoded once (AAC 48 kHz) and muxed identically into every output file.
+
+## How to test dual 1080p on a phone
+
+1. Install the debug APK on a Tier 1 or Tier 2 device.
+2. Launch **DualFrame Lab** → read the **Dual 1080p encode** card on the probe screen.
+   - If Dual is **NOT SUPPORTED**, the reason is listed; Dual mode is disabled in the viewfinder. Portrait/Landscape may still work.
+3. Open **capture (preview + record)**.
+4. Select **Dual**, frame the subject inside both overlays, tap **Record**, wait ≥10–30 s, tap **Stop**.
+5. Files land under app-specific movies, e.g.  
+   `Android/data/com.dualframe.prototype/files/Movies/DualFrame/`  
+   Named `DF_<yyyyMMdd_HHmmss>_L.mp4` and `DF_<yyyyMMdd_HHmmss>_P.mp4`.
+6. Pull with adb:
+
+```bash
+adb shell ls -la /sdcard/Android/data/com.dualframe.prototype/files/Movies/DualFrame/
+adb pull /sdcard/Android/data/com.dualframe.prototype/files/Movies/DualFrame/ ./captures/
+adb logcat -s DualFrameLab:I DualFrameLab:W
+```
+
+7. Confirm resolutions (~1920×1080 and ~1080×1920), that both files have audio, and note drop counters from on-screen REC HUD / logcat `STOP` lines.
+
+Single modes write only `_L` or `_P`.
+
+### Lab logging
+
+Filter tag **`DualFrameLab`**: `START`, `DROP`, `STOP`, `GATE` lines include pair id, timestamps, mime, paths, submitted/dropped frames, audio packet counts.
+
+## Architecture (Week 2)
+
+```
+CameraX Preview + ImageAnalysis (prefer 4:3 ~1920×1440)
+        │
+        ├─ centered 16:9 crop/scale → MediaCodec → DF_*_L.mp4
+        ├─ centered 9:16 crop/scale → MediaCodec → DF_*_P.mp4
+        └─ AudioRecord → one AAC encoder → same packets into both muxers
+```
+
+Crop/scale is a **CPU NV12** lab path (nearest-neighbor). Expect higher drop rates than a future GPU/`Surface` pipeline — drops are logged on purpose for Phase 0 measurements.
 
 ## Project layout
 
 ```
 app/src/main/java/com/dualframe/prototype/
-  MainActivity.kt                 # Permission gate + screen routing
-  camera/CameraCapabilityProbe.kt # Camera2 probe
-  model/                          # CaptureMode + capability models
+  MainActivity.kt
+  camera/
+    CameraCapabilityProbe.kt
+    DualEncodeCapability.kt      # empirical dual MediaCodec gate
+    ApproachARecorder.kt         # session + ImageAnalysis → encode
+    VideoTrackEncoder.kt
+    SharedAacEncoder.kt
+    YuvCropScaler.kt
+    CropGeometry.kt
+    RecordingLabLog.kt
+  model/
   ui/
-    CapabilityProbeScreen.kt
-    DualPreviewScreen.kt
-    DualCropOverlay.kt            # Composition-only frames
-    CaptureModeSelector.kt
-    theme/Theme.kt
 ```
 
-## What Week 2 will add
+## What cannot be verified without a physical device
 
-- Select a tall usable readout (prefer 4:3 / 1:1 over 16:9-primary when available)
-- Two crop/scale paths from one stream → portrait + landscape
-- Dual **1080p** hardware encode (HEVC preferred, H.264 fallback) + shared audio → two muxed files
-- Start/stop wiring from the viewfinder; basic on-device stats (drops / resolution)
-- First device matrix entries for Tier 1 and one Tier 2 phone
+- Actual dual concurrent encode stability / heat / battery
+- Real drop rates and A/V sync skew between `_L` and `_P`
+- Color/NV12 layout quirks per OEM encoder
+- Concurrent-camera ID behavior beyond the probe dump
+- APK assemble in this cloud VM (no SDK)
 
-Out of Week 1–2 scope: polished gallery, independent framing, Approach B dual-lens, iOS.
+## Week 3+ (not this PR)
+
+- 10-minute thermal / battery / drop runs; sync audits
+- Dual 4K attempts on capable devices
+- GPU crop path if CPU drops are unacceptable
 
 ## License / notes
 

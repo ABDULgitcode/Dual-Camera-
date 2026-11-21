@@ -10,6 +10,7 @@ data class DeviceCapabilityReport(
     val cameras: List<CameraCapability>,
     val concurrentCameraIds: List<Set<String>>,
     val concurrentSessionNotes: List<String>,
+    val dualEncodeSupport: DualEncodeSupport? = null,
 )
 
 data class CameraCapability(
