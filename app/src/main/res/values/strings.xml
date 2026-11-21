@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DualFrame Lab</string>
+    <string name="capability_probe">Capability probe</string>
+    <string name="dual_preview">Dual preview</string>
+    <string name="mode_portrait">Portrait</string>
+    <string name="mode_landscape">Landscape</string>
+    <string name="mode_dual">Dual</string>
+    <string name="camera_permission_rationale">Camera access is required to probe hardware and show the dual-crop viewfinder stub.</string>
+</resources>
